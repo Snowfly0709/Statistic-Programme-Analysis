@@ -421,7 +421,7 @@ $OUT[entry] = \emptyset;$
 
 **for each basic block/entry:**
 
-$OUT[B] = \emptyset;
+$OUT[B] = \emptyset$;
 
 Worklist <- all basic blocks
 
