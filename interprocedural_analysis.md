@@ -239,7 +239,154 @@ Alias Analysis: can two pointer point same obj?
 
 ### Key Factor in Pointer Analysis
 
-**Heap Abstraction**:
+Heap Abstraction
 
-**Context Sensitivity**:
+Context Sensitivity
 
+Flow Sensitive
+
+Analysis Scope
+
+### Heap Abstraction
+
+when in loops and recursion, the heap object can be unbounded.
+
+```bash
+for(i=0;i<3;i++){
+    A a = new A();
+}
+```
+when in dynamic analysis, this class will be called three times: o2.iteration i = 0,o2.iteration i = 1,o2.iteration i = 2
+
+to ensure termination in static analysis, we use heap abstraction model dynamically allocated, unbounded concrete objects as finite abstract objects.
+
+#### Allocation-site abstraction
+
+Model concrete objects by their **allocation sites**, and each abstract object per allocation site represents ALL allocated concrete objects in dynamic analysis.
+
+when in allocation-site abstraction, the class call will only be abstracted as **o2** in before example.
+
+### Context Sensitivity
+
+Context Sensitive: use each method multiple times. Different use has different data flow.
+
+Context insensitie: use each method one time and all data flow merge.
+
+### Flow Sensitivity
+
+flow sensitive: respect the execution order of the statements
+
+flow insensitive: ignore the CFG order, treat the whole program as a set of unorderd statement.
+
+### Analysis Scope
+
+whole-program: compute point-to information in all pointers.
+
+demand-driven: only compute information for pointers demanded.
+
+### Pointer Analysis in our case
+
+Allocation-Site/Context-Sensitive/Flow-intensitive/Whole-program
+
+### Concerned statement
+
+we only focus on pointer affect statement
+
+#### Pointers in Java
+
+1. Local variable:x
+
+2. Static field:C.f
+
+3. Instance field:x.f
+
+4. Array element:array[i]
+
+#### Pointer affecting statements
+
+New/Assign(x = y)/Store(x.f = y)/Load(y = x.f)/Call(r = x.k(a,...))
+
+#### Domains and notations
+
+Variables: V
+
+Fields: F
+
+Objects: $o_i,o_j \in$ O
+
+Instance field: $o_i.f , o_j.g \in$ $O \times F$
+
+Pointers include Variables & Instance field
+
+Points-to relations: pt-> $\rho(O)$ , $\rho(O)$ is the powerset of the O
+
+### Rules
+
+1. x = new T() =>  $\frac{}{pt(x).append(o_i)}\frac{\leftarrow premise}{\leftarrow conclusion}$ if no premise then unconditional
+
+2. y = x =>  $\frac{o_i\in pt(x)}{pt(y).append(o_i)}$
+
+3. x.f = y => $\frac{o_i\in pt(x),o_j\in pt(y)}{pt(o_i.f).append(o_j)}$
+
+4. y = x.f => $\frac{o_i\in pt(x),o_j\in pt(x.f)}{pt(y).append(o_j)}$
+
+## Pointer Analysis Foundation
+
+### Pointer Flow Graph(PFG)
+
+display how objects flow among the pointers in the program.
+
+Nodes: $V\bigcup U \times F$
+
+Edges: $Pointer \times Pointer$
+
+### Pointer Analysis Algorithms
+
+```bash
+# Main Algorithm
+Solve(S){
+    WL = [],PFG=[]
+    for each i : x = new T() in S{
+        add <x,o_i> to WL
+    }
+    for each x = y in S{
+        addEdge(y,x)
+    }
+    while(WL not empty){
+        remove top<n,pts> from WL
+        delta = pts - pt(n)
+        Propagate(n,delta)
+
+        if(n == variable x){
+            for each o_i in delta{
+                for each x.f = y in S{
+                    addEdge(y,o_i.f)
+                }
+                for each y = x.f in S{
+                    addEdge(o_i.f,y)
+                }
+            }
+        }
+    }
+}
+
+#Propagate
+Propagate(n,pts){
+    if(pts not empty){
+        pt(n) = pt(n) & pts
+        for each n -> (s in PFG){
+            add <s,pts> to WL
+        }
+    }
+}
+
+# addEdge
+addEdge(s,t){
+    if(s -> t not in PFG){
+        add s-> t to PFG
+        if(pt(s) not empty){
+            add <t, pt(s)> to WL 
+        }
+    }
+}
+```
