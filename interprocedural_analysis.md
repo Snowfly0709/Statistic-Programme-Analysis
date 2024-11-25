@@ -42,7 +42,7 @@ Pointer Analysis
 
 越往下越精确，越往上效率越高
 
-#### Method Dispatch o Virtual Call
+#### Method Dispatch on Virtual Call
 
 a virtual call is resolved based on:
 
@@ -118,9 +118,9 @@ class D extends B{
 
 Resolve(c.foo()) = {C.foo()}
 
-Resolve(a.foo()) = {a.foo(),c.foo(),d.foo()}
+Resolve(a.foo()) = {A.foo(),C.foo(),D.foo()}
 
-Resolve(b.foo()) = {a.foo(),c.foo(),d.foo()}
+Resolve(b.foo()) = {A.foo(),C.foo(),D.foo()}
 
 如果在声明时使用了B b = new B() 此时Resolve的dispatch结果仍然不变，同样包含c.foo() & d.foo(), 与我们前文中所写的本类中没有应该在父类中调用有所不符，这就是CHA方法带来的“假”调用。
 
@@ -366,6 +366,126 @@ Solve(S){
                     addEdge(o_i.f,y)
                 }
             }
+        }
+    }
+}
+
+#Propagate
+Propagate(n,pts){
+    if(pts not empty){
+        pt(n) = pt(n) & pts
+        for each n -> (s in PFG){
+            add <s,pts> to WL
+        }
+    }
+}
+
+# addEdge
+addEdge(s,t){
+    if(s -> t not in PFG){
+        add s-> t to PFG
+        if(pt(s) not empty){
+            add <t, pt(s)> to WL 
+        }
+    }
+}
+```
+
+Propagation aims to transfer delta to reduce loop count.
+
+### Pointer Analysis with Method Calls
+
+#### Difference between CHA and pointer-analysis in Call Graph Construction
+
+1. CHA:imprecise, may introduce spurious call edges
+2. pointer analysis:precise
+
+#### Rules for method call
+
+r = x.k(a1,...,an) => $\frac{o_i \in pt(x), m = Dispatch(o_i,k),o_u \in pt(a_j),o_v \in pt(m_{ret})}{o_i\in pt(m_{this}),o_u\in pt(m_{pj}),o_v \in pt(r)}$
+
+1. $Dispatch(o_i,k),o_i\in pt(x)$ resolve the virtual dispatch of k on o_i
+
+2. $m_{this}$ : this variable of m
+
+3. $m_{pj}$ : the j-th parameter of m
+
+4. $m_{ret}$ : the variable that holds return value
+
+```bash
+C x = new T()
+
+r = x.foo(a1,a2);
+
+class T {
+    B foo (A p1, A p2){
+        this;
+        return ret;
+    }
+}
+```
+
+PFG Edges: a1 -> p1, a2 -> p2, ret -> r
+
+### Algorithms(pointer analysis and Call Graph Construction combined)
+
+S: set of reachable statement
+
+S_M: set of statement in method M
+
+RM: reachable method
+
+CG: call graph edges
+
+```bash
+Solve(m_entry){
+    WL=[],PFG=[],S=[],RM=[],CG=[]
+    AddReachable(m_entry)
+    while(WL not empty){
+        remove top<n,pts> from WL
+        delta = pts - pt(n)
+        Propagate(n,delta)
+
+        if(n == variable x){
+            for each o_i in delta{
+                for each x.f = y in S{
+                    addEdge(y,o_i.f)
+                }
+                for each y = x.f in S{
+                    addEdge(o_i.f,y)
+                }
+                ProcessCall(x,o_i)
+            }
+        }
+    }
+}
+
+#Reachable
+AddReachable(m){
+    if(m !in RM){
+        add m to RM
+        S = S combine S_M
+        for each i: x = new T() in S_M{
+            add <x,o_i> to WL
+        }
+        for each x = y in S_M{
+            AddEdge(y,x)
+        }
+    }
+}
+
+#MethodCall
+ProcessCall(x,o_i){
+    for each l: r = x.k(a1,...,an) in S{
+        m = Dispatch(o_i,k)
+        add <m_this,o_i> to WL
+        if(l -> m !in CG){
+            add l -> m to CG
+            AddReachable(m)
+            for each p_i of m{
+                AddEdge(a_i,p_i)
+            }
+            AddEdge(m_ret,r)
         }
     }
 }
