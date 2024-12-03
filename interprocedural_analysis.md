@@ -256,6 +256,7 @@ for(i=0;i<3;i++){
     A a = new A();
 }
 ```
+
 when in dynamic analysis, this class will be called three times: o2.iteration i = 0,o2.iteration i = 1,o2.iteration i = 2
 
 to ensure termination in static analysis, we use heap abstraction model dynamically allocated, unbounded concrete objects as finite abstract objects.
